@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
  * @hide
  */
 final class UnattendedRebootManager {
-  private static final int DEFAULT_REBOOT_WINDOW_START_TIME_HOUR = 1;
+  private static final int DEFAULT_REBOOT_WINDOW_START_TIME_HOUR = 3;
   private static final int DEFAULT_REBOOT_WINDOW_END_TIME_HOUR = 5;
 
   private static final int DEFAULT_REBOOT_FREQUENCY_DAYS = 2;
@@ -200,7 +200,7 @@ final class UnattendedRebootManager {
             .atZone(mInjector.zoneId())
             .toLocalDate()
             .plusDays(mInjector.getRebootFrequency())
-            .atTime(mInjector.getRebootStartTime(), /* minute= */ 0);
+            .atTime(mInjector.getRebootStartTime(), /* minute= */ 12);
     long rebootTimeMillis = timeToReboot.atZone(mInjector.zoneId()).toInstant().toEpochMilli();
     Log.v(TAG, "Scheduling unattended reboot at time " + timeToReboot);
 
