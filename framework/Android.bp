@@ -30,7 +30,7 @@ java_sdk_library {
     apex_available: [
         "com.android.configinfrastructure",
     ],
-    min_sdk_version: "UpsideDownCake",
+    min_sdk_version: "34",
     sdk_version: "module_current",
     impl_library_visibility: [
         "//packages/modules/ConfigInfrastructure:__subpackages__"

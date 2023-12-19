@@ -44,7 +44,7 @@ java_sdk_library {
     impl_only_libs: [
         "DeviceConfigServiceResources",
     ],
-    min_sdk_version: "UpsideDownCake",
+    min_sdk_version: "34",
     sdk_version: "system_server_current",
     jarjar_rules: "jarjar-rules.txt",
     impl_library_visibility: [
@@ -62,7 +62,7 @@ aconfig_declarations {
 
 java_aconfig_library {
     name: "device_config_reboot_flags_java_lib",
-    min_sdk_version: "UpsideDownCake",
+    min_sdk_version: "34",
     apex_available: [
         "com.android.configinfrastructure",
     ],
