@@ -33,10 +33,13 @@ java_sdk_library {
     min_sdk_version: "34",
     sdk_version: "module_current",
     impl_library_visibility: [
-        "//packages/modules/ConfigInfrastructure:__subpackages__"
+        "//packages/modules/ConfigInfrastructure:__subpackages__",
     ],
     static_libs: [
         "modules-utils-build",
     ],
     jarjar_rules: "jarjar-rules.txt",
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
