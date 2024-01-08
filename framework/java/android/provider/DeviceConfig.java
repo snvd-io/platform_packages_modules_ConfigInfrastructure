@@ -1641,23 +1641,19 @@ public final class DeviceConfig {
         List<String> pathSegments = uri.getPathSegments();
         // pathSegments(0) is "config"
         final String namespace = pathSegments.get(1);
-        final Properties properties;
-        if (pathSegments.size() > 2) {
-            String[] keys = new String[pathSegments.size() - 2];
+        Properties.Builder propBuilder = new Properties.Builder(namespace);
+        try {
+            Properties allProperties = getProperties(namespace);
             for (int i = 2; i < pathSegments.size(); ++i) {
-                keys[i - 2] = pathSegments.get(i);
+                String key = pathSegments.get(i);
+                propBuilder.setString(key, allProperties.getString(key, null));
             }
-
-            try {
-                properties = getProperties(namespace, keys);
-            } catch (SecurityException e) {
-                // Silently failing to not crash binder or listener threads.
-                Log.e(TAG, "OnPropertyChangedListener update failed: permission violation.");
-                return;
-            }
-        } else {
-            properties = new Properties.Builder(namespace).build();
+        } catch (SecurityException e) {
+            // Silently failing to not crash binder or listener threads.
+            Log.e(TAG, "OnPropertyChangedListener update failed: permission violation.");
+            return;
         }
+        Properties properties = propBuilder.build();
 
         synchronized (sLock) {
             for (int i = 0; i < sListeners.size(); i++) {
