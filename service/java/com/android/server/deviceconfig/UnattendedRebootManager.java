@@ -1,5 +1,6 @@
 package com.android.server.deviceconfig;
 
+import static com.android.server.deviceconfig.Flags.enableCustomRebootTimeConfigurations;
 import static com.android.server.deviceconfig.Flags.enableSimPinReplay;
 
 import android.annotation.NonNull;
@@ -20,12 +21,14 @@ import android.os.PowerManager;
 import android.os.RecoverySystem;
 import android.os.SystemClock;
 import android.util.Log;
+import android.util.Pair;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -55,6 +58,9 @@ final class UnattendedRebootManager {
   static final String ACTION_TRIGGER_REBOOT = "com.android.server.deviceconfig.TRIGGER_REBOOT";
 
   private final Context mContext;
+
+  @Nullable
+  private final RebootTimingConfiguration mRebootTimingConfiguration;
 
   private boolean mLskfCaptured;
 
@@ -141,10 +147,12 @@ final class UnattendedRebootManager {
   UnattendedRebootManager(
       Context context,
       UnattendedRebootManagerInjector injector,
-      SimPinReplayManager simPinReplayManager) {
+      SimPinReplayManager simPinReplayManager,
+      @Nullable RebootTimingConfiguration rebootTimingConfiguration) {
     mContext = context;
     mInjector = injector;
     mSimPinReplayManager = simPinReplayManager;
+    mRebootTimingConfiguration = rebootTimingConfiguration;
 
     mContext.registerReceiver(
         new BroadcastReceiver() {
@@ -169,7 +177,12 @@ final class UnattendedRebootManager {
   }
 
   UnattendedRebootManager(Context context) {
-    this(context, new InjectorImpl(), new SimPinReplayManager(context));
+    this(context,
+        new InjectorImpl(),
+        new SimPinReplayManager(context),
+        enableCustomRebootTimeConfigurations()
+            ? new RebootTimingConfiguration(context)
+            : null);
   }
 
   public void prepareUnattendedReboot() {
@@ -195,12 +208,20 @@ final class UnattendedRebootManager {
 
   public void scheduleReboot() {
     // Reboot the next day at the reboot start time.
+    final int rebootHour;
+    if (enableCustomRebootTimeConfigurations()) {
+      Optional<Pair<Integer, Integer>> rebootWindowStartEndHour =
+          mRebootTimingConfiguration.getRebootWindowStartEndHour();
+      rebootHour = rebootWindowStartEndHour.isEmpty() ? 0 : rebootWindowStartEndHour.get().first;
+    } else {
+      rebootHour = mInjector.getRebootStartTime();
+    }
     LocalDateTime timeToReboot =
         Instant.ofEpochMilli(mInjector.now())
             .atZone(mInjector.zoneId())
             .toLocalDate()
-            .plusDays(mInjector.getRebootFrequency())
-            .atTime(mInjector.getRebootStartTime(), /* minute= */ 12);
+            .plusDays(getRebootFrequencyDays())
+            .atTime(rebootHour, /* minute= */ 12);
     long rebootTimeMillis = timeToReboot.atZone(mInjector.zoneId()).toInstant().toEpochMilli();
     Log.v(TAG, "Scheduling unattended reboot at time " + timeToReboot);
 
@@ -217,14 +238,10 @@ final class UnattendedRebootManager {
   void tryRebootOrSchedule() {
     Log.v(TAG, "Attempting unattended reboot");
 
+    final int rebootFrequencyDays = getRebootFrequencyDays();
     // Has enough time passed since reboot?
-    if (TimeUnit.MILLISECONDS.toDays(mInjector.elapsedRealtime())
-        < mInjector.getRebootFrequency()) {
-      Log.v(
-          TAG,
-          "Device has already been rebooted in that last "
-              + mInjector.getRebootFrequency()
-              + " days.");
+    if (TimeUnit.MILLISECONDS.toDays(mInjector.elapsedRealtime()) < rebootFrequencyDays) {
+      Log.v(TAG, "Device has already been rebooted in that last " + rebootFrequencyDays + " days.");
       scheduleReboot();
       return;
     }
@@ -254,8 +271,16 @@ final class UnattendedRebootManager {
             .atZone(mInjector.zoneId())
             .toLocalDateTime()
             .getHour();
-    if (currentHour < mInjector.getRebootStartTime()
-        || currentHour >= mInjector.getRebootEndTime()) {
+    final boolean isHourWithinRebootHourWindow;
+    if (enableCustomRebootTimeConfigurations()) {
+      isHourWithinRebootHourWindow =
+          mRebootTimingConfiguration.isHourWithinRebootHourWindow(currentHour);
+    } else {
+      isHourWithinRebootHourWindow =
+          currentHour >= mInjector.getRebootStartTime()
+          && currentHour < mInjector.getRebootEndTime();
+    }
+    if (!isHourWithinRebootHourWindow) {
       Log.v(TAG, "Reboot requested outside of reboot window, reschedule reboot.");
       prepareUnattendedReboot();
       scheduleReboot();
@@ -280,6 +305,12 @@ final class UnattendedRebootManager {
       Log.e(TAG, e.getLocalizedMessage());
       scheduleReboot();
     }
+  }
+
+  private int getRebootFrequencyDays() {
+    return enableCustomRebootTimeConfigurations()
+        ? mRebootTimingConfiguration.getRebootFrequencyDays()
+        : mInjector.getRebootFrequency();
   }
 
   private boolean isPreparedForUnattendedReboot() {

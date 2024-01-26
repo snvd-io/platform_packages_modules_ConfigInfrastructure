@@ -1,6 +1,7 @@
 package com.android.server.deviceconfig;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static com.android.server.deviceconfig.Flags.FLAG_ENABLE_CUSTOM_REBOOT_TIME_CONFIGURATIONS;
 import static com.android.server.deviceconfig.Flags.FLAG_ENABLE_SIM_PIN_REPLAY;
 
 import static com.android.server.deviceconfig.UnattendedRebootManager.ACTION_RESUME_ON_REBOOT_LSKF_CAPTURED;
@@ -9,6 +10,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +57,7 @@ public class UnattendedRebootManagerTest {
   private Context mContext;
   private KeyguardManager mKeyguardManager;
   private ConnectivityManager mConnectivityManager;
+  private RebootTimingConfiguration mRebootTimingConfiguration;
   private FakeInjector mFakeInjector;
   private UnattendedRebootManager mRebootManager;
   private SimPinReplayManager mSimPinReplayManager;
@@ -70,6 +73,8 @@ public class UnattendedRebootManagerTest {
     mSimPinReplayManager = mock(SimPinReplayManager.class);
     mKeyguardManager = mock(KeyguardManager.class);
     mConnectivityManager = mock(ConnectivityManager.class);
+    mRebootTimingConfiguration =
+        new RebootTimingConfiguration(REBOOT_START_HOUR, REBOOT_END_HOUR, REBOOT_FREQUENCY);
 
     mContext =
         new ContextWrapper(getInstrumentation().getTargetContext()) {
@@ -85,7 +90,9 @@ public class UnattendedRebootManagerTest {
         };
 
     mFakeInjector = new FakeInjector();
-    mRebootManager = new UnattendedRebootManager(mContext, mFakeInjector, mSimPinReplayManager);
+    mRebootManager =
+        new UnattendedRebootManager(
+            mContext, mFakeInjector, mSimPinReplayManager, mRebootTimingConfiguration);
 
     // Need to register receiver in tests so that the test doesn't trigger reboot requested by
     // deviceconfig.
@@ -218,7 +225,21 @@ public class UnattendedRebootManagerTest {
   }
 
   @Test
-  public void scheduleReboot_elapsedRealtimeLessThanFrequency() {
+  public void scheduleReboot_elapsedRealtimeLessThanFrequency_withDefaultTimeConfigurations() {
+    scheduleReboot_elapsedRealtimeLessThanFrequency(/* enableCustomTimeConfig= */ false);
+  }
+
+  @Test
+  public void scheduleReboot_elapsedRealtimeLessThanFrequency_withCustomTimeConfigurations() {
+    scheduleReboot_elapsedRealtimeLessThanFrequency(/* enableCustomTimeConfig= */ true);
+  }
+
+  private void scheduleReboot_elapsedRealtimeLessThanFrequency(boolean enableCustomTimeConfig) {
+    if (enableCustomTimeConfig) {
+      mSetFlagsRule.enableFlags(FLAG_ENABLE_CUSTOM_REBOOT_TIME_CONFIGURATIONS);
+    } else {
+      mSetFlagsRule.disableFlags(FLAG_ENABLE_CUSTOM_REBOOT_TIME_CONFIGURATIONS);
+    }
     Log.i(TAG, "scheduleReboot_elapsedRealtimeLessThanFrequency");
     when(mKeyguardManager.isDeviceSecure()).thenReturn(true);
     when(mConnectivityManager.getNetworkCapabilities(any()))
@@ -239,7 +260,19 @@ public class UnattendedRebootManagerTest {
   }
 
   @Test
-  public void tryRebootOrSchedule_outsideRebootWindow() {
+  public void tryRebootOrSchedule_outsideRebootWindow_withDefaultTimeConfigurations() {
+    tryRebootOrSchedule_outsideRebootWindow(/* enableCustomTimeConfig= */ false);
+  }
+
+  @Test
+  public void tryRebootOrSchedule_outsideRebootWindow_withCustomTimeConfigurations() {
+    tryRebootOrSchedule_outsideRebootWindow(/* enableCustomTimeConfig= */ true);
+  }
+
+  private void tryRebootOrSchedule_outsideRebootWindow(boolean enableCustomTimeConfig) {
+    if (enableCustomTimeConfig) {
+      mSetFlagsRule.enableFlags(FLAG_ENABLE_CUSTOM_REBOOT_TIME_CONFIGURATIONS);
+    }
     Log.i(TAG, "scheduleReboot_internetOutsideRebootWindow");
     when(mKeyguardManager.isDeviceSecure()).thenReturn(true);
     when(mConnectivityManager.getNetworkCapabilities(any()))
