@@ -1875,7 +1875,7 @@ public final class DeviceConfig {
          * @hide
          */
         public @NonNull Map<String, String> getPropertyValues() {
-            return new HashMap<>(mMap);
+            return Collections.unmodifiableMap(mMap);
         }
 
         /**
