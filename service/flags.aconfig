@@ -26,3 +26,10 @@ flag {
   description: "This flags controls allowing devices to configure the reboot window and frequency."
   bug: "322076175"
 }
+
+flag {
+  name: "enable_charger_dependency_for_reboot"
+  namespace: "core_experiments_team_internal"
+  description: "This flags controls allowing devices to configure reboot to require charging."
+  bug: "322076175"
+}

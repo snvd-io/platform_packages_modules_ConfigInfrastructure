@@ -1,5 +1,6 @@
 package com.android.server.deviceconfig;
 
+import static com.android.server.deviceconfig.Flags.enableChargerDependencyForReboot;
 import static com.android.server.deviceconfig.Flags.enableCustomRebootTimeConfigurations;
 import static com.android.server.deviceconfig.Flags.enableSimPinReplay;
 
@@ -17,12 +18,15 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.os.BatteryManager;
 import android.os.PowerManager;
 import android.os.RecoverySystem;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Pair;
+
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.deviceconfig.resources.R;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -67,6 +71,17 @@ final class UnattendedRebootManager {
   private final UnattendedRebootManagerInjector mInjector;
 
   private final SimPinReplayManager mSimPinReplayManager;
+
+  private boolean mChargingReceiverRegistered;
+
+  private final BroadcastReceiver mChargingReceiver = new BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+      mChargingReceiverRegistered = false;
+      mContext.unregisterReceiver(mChargingReceiver);
+      tryRebootOrSchedule();
+    }
+  };
 
   private static class InjectorImpl implements UnattendedRebootManagerInjector {
     InjectorImpl() {
@@ -127,6 +142,11 @@ final class UnattendedRebootManager {
 
     public boolean isPreparedForUnattendedUpdate(@NonNull Context context) throws IOException {
       return RecoverySystem.isPreparedForUnattendedUpdate(context);
+    }
+
+    @Override
+    public boolean requiresChargingForReboot(Context context) {
+      return context.getResources().getBoolean(R.bool.config_requireChargingForUnattendedReboot);
     }
 
     public void regularReboot(Context context) {
@@ -292,6 +312,13 @@ final class UnattendedRebootManager {
       scheduleReboot();
     }
 
+    if (enableChargerDependencyForReboot()
+        && mInjector.requiresChargingForReboot(mContext)
+        && !isCharging(mContext)) {
+      triggerRebootOnCharging();
+      return;
+    }
+
     // Proceed with RoR.
     Log.v(TAG, "Rebooting device to apply device config flags.");
     try {
@@ -326,6 +353,16 @@ final class UnattendedRebootManager {
     }
   }
 
+  private void triggerRebootOnCharging() {
+    if (!mChargingReceiverRegistered) {
+      mChargingReceiverRegistered = true;
+      mContext.registerReceiver(
+          mChargingReceiver,
+          new IntentFilter(BatteryManager.ACTION_CHARGING),
+          Context.RECEIVER_EXPORTED);
+    }
+  }
+
   /** Returns true if the device has screen lock. */
   private static boolean isDeviceSecure(Context context) {
     KeyguardManager keyguardManager = context.getSystemService(KeyguardManager.class);
@@ -335,6 +372,12 @@ final class UnattendedRebootManager {
       return true;
     }
     return keyguardManager.isDeviceSecure();
+  }
+
+  private static boolean isCharging(Context context) {
+    BatteryManager batteryManager =
+        (BatteryManager) context.getSystemService(Context.BATTERY_SERVICE);
+    return batteryManager.isCharging();
   }
 
   private static boolean isNetworkConnected(Context context) {

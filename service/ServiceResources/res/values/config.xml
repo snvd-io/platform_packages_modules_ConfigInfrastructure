@@ -37,4 +37,7 @@
     <!-- The unattended reboot frequency in days. Should be a positive value.
          If a non-positive value is provided, the default frqeuency will be applied. -->
     <integer name="config_unattendedRebootFrequencyDays">2</integer>
+
+    <!-- Whether or not the device needs to be charging to trigger unattended reboot.-->
+    <bool name="config_requireChargingForUnattendedReboot">false</bool>
 </resources>
