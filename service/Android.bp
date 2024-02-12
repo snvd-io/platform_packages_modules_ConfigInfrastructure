@@ -18,7 +18,7 @@ package {
 
 java_sdk_library {
     name: "service-configinfrastructure",
-    srcs: [ "java/**/*.java" ],
+    srcs: ["java/**/*.java"],
     defaults: [
         "framework-system-server-module-defaults",
         "framework-system-server-module-optimize-defaults",
@@ -35,7 +35,7 @@ java_sdk_library {
         "modules-utils-shell-command-handler",
         "device_config_reboot_flags_java_lib",
         "guava",
-        "libaconfig_java_proto_lite"
+        "libaconfig_java_proto_lite",
     ],
     libs: [
         "framework-configinfrastructure.impl",
@@ -55,8 +55,9 @@ java_sdk_library {
 aconfig_declarations {
     name: "device_config_reboot_flags",
     package: "com.android.server.deviceconfig",
+    container: "com.android.configinfrastructure",
     srcs: [
-      "flags.aconfig",
+        "flags.aconfig",
     ],
 }
 
